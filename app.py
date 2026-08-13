@@ -162,6 +162,11 @@ PAGE_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Lahshishi Marketing Agency helps businesses grow through social media management, content creation, website design, business registration, and growth strategies.">
+    <meta name="keywords" content="marketing agency, social media management, content creation, website design, business registration, business growth strategies, South Africa">
+    <meta property="og:title" content="{{ business_name }} - We Take Your Business To The Higher Level">
+    <meta property="og:description" content="Social media management, content creation, website design, business registration, and growth strategies - all in one place.">
+    <meta property="og:type" content="website">
     <title>{{ business_name }}</title>
     <style>
         :root {
@@ -416,6 +421,23 @@ def home():
         success=success
     )
     return render_page(content)
+
+
+@app.route("/robots.txt")
+def robots():
+    return (
+        "User-agent: *\nAllow: /\nSitemap: " + request.url_root + "sitemap.xml",
+        200,
+        {"Content-Type": "text/plain"}
+    )
+
+@app.route("/sitemap.xml")
+def sitemap():
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url><loc>{request.url_root}</loc></url>
+</urlset>"""
+    return (xml, 200, {"Content-Type": "application/xml"})
 
 
 # ---------------------------------------------------------------------------
