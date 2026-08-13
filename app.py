@@ -1,46 +1,41 @@
 """
-Marketing Agency Website - Sell Your Car / Graphic Design / Entrepreneurial Course
------------------------------------------------------------------------------------
+Lahshishi Marketing Agency - Official Website (based on poster design)
+------------------------------------------------------------------------
 HOW TO RUN IN PYCHARM:
-1. Create a new PyCharm project (or open an existing one).
-2. Copy this whole file into a file called app.py
-3. Open the Terminal tab at the bottom of PyCharm and run:
-       pip install flask
-4. Right-click this file and choose "Run 'app'" (or press the green play button).
-5. Open the link it prints in your terminal (usually http://127.0.0.1:5000)
+1. Copy this whole file into a file called app.py in a new PyCharm project
+2. In the Terminal tab, run:  pip install flask
+3. Right-click this file -> Run 'app'
+4. Open the link it prints (usually http://127.0.0.1:5000)
 
-OPTIONAL - Email notifications when someone submits a form:
-- Install flask-mail:  pip install flask-mail python-dotenv
-- Fill in MAIL_USERNAME, MAIL_PASSWORD, NOTIFY_EMAIL below.
-- If left blank, the site still works fine - it just skips sending email
-  and only saves the lead to the database (site.db).
-
-WHATSAPP:
-- Change WHATSAPP_NUMBER below to your own number (country code, no + or spaces).
-  Example: South African number 082 123 4567 -> "27821234567"
+Don't forget: put your logo file at static/images/logo.jpg (same as before)
 """
 
+import os
 import sqlite3
 from datetime import datetime
 from flask import Flask, request, redirect, render_template_string, g
 
 # ---------------------------------------------------------------------------
-# CONFIG - edit these values for your business
+# CONFIG - matches the poster
 # ---------------------------------------------------------------------------
 BUSINESS_NAME = "Lahshishi Marketing Agency"
 TAGLINE = "We take your business to the higher level"
-WHATSAPP_NUMBER = "0672281091"   # <-- put your real WhatsApp number here
+PHONE_DISPLAY = "067 288 1091"
+WHATSAPP_NUMBER = "27672881091"   # 067 288 1091 converted to international format
+EMAIL = "lma.businessgrowth@gmail.com"
 DATABASE = "site.db"
 
-# Optional email settings - leave blank to disable email notifications
-MAIL_USERNAME = ""      # e.g. "youremail@gmail.com"
-MAIL_PASSWORD = ""      # e.g. Gmail App Password
-NOTIFY_EMAIL = ""       # where you want to receive lead notifications
+# Optional email notifications - fill in later if you want form submissions emailed to you
+# Optional email notifications - set these as Environment Variables on Render,
+# never write your real password directly in this file once it's on GitHub.
+MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")
+MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
+NOTIFY_EMAIL = os.environ.get("NOTIFY_EMAIL", "")
 
 app = Flask(__name__)
 
 # ---------------------------------------------------------------------------
-# DATABASE HELPERS (using plain SQLite - no extra libraries needed)
+# DATABASE HELPERS
 # ---------------------------------------------------------------------------
 def get_db():
     if "db" not in g:
@@ -78,21 +73,19 @@ def save_lead(name, phone, email, service, details):
     )
     db.commit()
     maybe_send_email(name, phone, email, service, details)
+    maybe_send_thank_you(name, email)
 
 def maybe_send_email(name, phone, email, service, details):
-    """Sends an email notification only if credentials are filled in above."""
     if not MAIL_USERNAME or not MAIL_PASSWORD or not NOTIFY_EMAIL:
-        return  # email not configured - skip silently
+        return
     try:
         import smtplib
         from email.mime.text import MIMEText
-
         body = f"New lead ({service})\n\nName: {name}\nPhone: {phone}\nEmail: {email}\nDetails: {details}"
         msg = MIMEText(body)
         msg["Subject"] = f"New website lead: {service}"
         msg["From"] = MAIL_USERNAME
         msg["To"] = NOTIFY_EMAIL
-
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
             server.login(MAIL_USERNAME, MAIL_PASSWORD)
@@ -100,96 +93,204 @@ def maybe_send_email(name, phone, email, service, details):
     except Exception as e:
         print(f"[Email notification failed - lead was still saved] {e}")
 
+def maybe_send_thank_you(name, email):
+    """Sends an automatic thank-you email to the customer, with a link to WhatsApp."""
+    if not MAIL_USERNAME or not MAIL_PASSWORD or not email:
+        return  # no email configured, or customer didn't leave an email - skip silently
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+
+        first_name = (name or "there").split(" ")[0]
+        whatsapp_link = f"https://wa.me/{WHATSAPP_NUMBER}"
+
+        body = (
+            f"Hi {first_name},\n\n"
+            f"Thank you for reaching out to {BUSINESS_NAME}. We've received your message "
+            f"and a member of our team will get back to you shortly.\n\n"
+            f"If you'd like to chat with us right away, click the link below to message us "
+            f"directly on WhatsApp:\n\n"
+            f"{whatsapp_link}\n\n"
+            f"{TAGLINE}.\n\n"
+            f"Kind regards,\n"
+            f"{BUSINESS_NAME}"
+        )
+        msg = MIMEText(body)
+        msg["Subject"] = f"Thanks for reaching out to {BUSINESS_NAME}"
+        msg["From"] = MAIL_USERNAME
+        msg["To"] = email
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(MAIL_USERNAME, MAIL_PASSWORD)
+            server.send_message(msg)
+    except Exception as e:
+        print(f"[Thank-you email failed - lead was still saved] {e}")
+
 # ---------------------------------------------------------------------------
-# SHARED PAGE LAYOUT (base template)
+# SERVICES (from the poster)
 # ---------------------------------------------------------------------------
-BASE_TEMPLATE = """
+SERVICES = [
+    {
+        "title": "Social Media Management",
+        "text": "We manage your social platforms to build engagement and grow your brand."
+    },
+    {
+        "title": "Business Content Creation",
+        "text": "High-quality content and advertisement videos that capture attention and drive results."
+    },
+    {
+        "title": "Website Design & Management",
+        "text": "Modern, responsive websites that represent your brand and convert visitors into customers."
+    },
+    {
+        "title": "Business Registration",
+        "text": "We help you register your business the right way and get you officially established."
+    },
+    {
+        "title": "Business Growth Strategies",
+        "text": "Proven strategies to increase your visibility, attract more customers, and grow your business."
+    },
+]
+
+# ---------------------------------------------------------------------------
+# PAGE TEMPLATE
+# ---------------------------------------------------------------------------
+PAGE_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ business_name }} - {{ page_title }}</title>
+    <title>{{ business_name }}</title>
     <style>
         :root {
-            --gold: #e8a765;
-            --black: #0d0d0d;
-            --panel: #1a1a1a;
+            --orange: #d4af37;
+            --orange-light: #e8c766;
+            --black: #0a0a0a;
+            --panel: #161616;
             --text-light: #f2f2f2;
+            --text-muted: #b8b8b8;
         }
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: var(--black); color: var(--text-light); }
-        nav { background: #000; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #2a2a2a; }
-        .brand-group { display: flex; align-items: center; gap: 12px; }
-        .brand-group img { height: 44px; width: auto; }
-        .brand { font-size: 19px; font-weight: bold; color: var(--gold); letter-spacing: 0.5px; }
-        nav .links a { color: #ddd; text-decoration: none; margin-left: 20px; font-weight: 500; font-size: 15px; }
-        nav .links a:hover { color: var(--gold); }
-        .container { max-width: 800px; margin: 50px auto; padding: 0 20px; }
-        h1 { color: var(--gold); font-weight: 700; }
-        h2 { color: var(--text-light); }
-        p, li { color: #cfcfcf; line-height: 1.6; }
-        .tagline { color: #aaa; font-style: italic; margin-top: -10px; }
-        .card {
-            background: var(--panel); padding: 26px; border-radius: 12px;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.4); margin-bottom: 20px;
-            border: 1px solid #2a2a2a;
+
+        nav {
+            background: #000; padding: 16px 32px; display: flex; justify-content: space-between;
+            align-items: center; flex-wrap: wrap; border-bottom: 1px solid #262626;
+            position: sticky; top: 0; z-index: 10;
         }
-        .card a { color: var(--gold); text-decoration: none; }
-        .card a:hover { text-decoration: underline; }
-        form { display: flex; flex-direction: column; gap: 12px; max-width: 420px; }
+        nav img { height: 46px; width: auto; }
+        nav .links a { color: #ddd; text-decoration: none; margin-left: 22px; font-weight: 500; font-size: 15px; }
+        nav .links a:hover { color: var(--orange); }
+
+        .hero {
+            max-width: 1000px; margin: 0 auto; padding: 70px 24px 50px; text-align: center;
+        }
+        .hero h1 { font-size: 40px; line-height: 1.25; margin-bottom: 10px; }
+        .hero h1 .highlight { color: var(--orange); }
+        .hero p.tagline { color: var(--orange-light); font-style: italic; font-size: 16px; margin-top: 0; }
+        .hero p.description { max-width: 600px; margin: 20px auto 0; color: var(--text-muted); font-size: 16px; line-height: 1.7; }
+
+        .section { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
+        .section-label {
+            display: inline-block; background: var(--orange); color: #111; font-weight: bold;
+            padding: 8px 20px; border-radius: 4px; font-size: 14px; letter-spacing: 0.5px; margin-bottom: 30px;
+        }
+
+        html { scroll-behavior: smooth; }
+        .services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+        .service-card {
+            background: var(--panel); border: 1px solid #262626; border-left: 3px solid var(--orange);
+            border-radius: 8px; padding: 24px; cursor: pointer;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+        .service-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.15);
+            border-color: var(--orange);
+        }
+        .service-card.selected {
+            border-color: var(--orange); box-shadow: 0 0 0 1px var(--orange);
+            background: #1c1706;
+        }
+        .service-card h3 { margin: 0 0 10px; color: var(--text-light); font-size: 18px; display: flex; align-items: center; justify-content: space-between; }
+        .service-card h3 .arrow { color: var(--orange); font-size: 18px; opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; transform: translateX(-4px); }
+        .service-card:hover h3 .arrow { opacity: 1; transform: translateX(0); }
+        .service-card p { margin: 0; color: var(--text-muted); font-size: 14.5px; line-height: 1.6; }
+
+        .promise-strip {
+            display: flex; justify-content: center; gap: 50px; flex-wrap: wrap;
+            padding: 30px 24px; border-top: 1px solid #262626; border-bottom: 1px solid #262626;
+            text-align: center;
+        }
+        .promise-strip .item span { display: block; color: var(--orange); font-weight: bold; font-size: 15px; }
+
+        .cta-box {
+            max-width: 1000px; margin: 50px auto; padding: 26px 30px; border: 1px solid var(--orange);
+            border-radius: 10px; text-align: center;
+        }
+        .cta-box h2 { color: var(--orange); margin: 0 0 8px; font-size: 22px; }
+        .cta-box p { color: var(--text-muted); margin: 0; }
+
+        form { display: flex; flex-direction: column; gap: 12px; max-width: 460px; margin: 0 auto; }
         input, textarea {
-            padding: 11px; border: 1px solid #333; border-radius: 6px; font-size: 15px;
+            padding: 12px; border: 1px solid #333; border-radius: 6px; font-size: 15px;
             background: #111; color: #fff;
         }
         input::placeholder, textarea::placeholder { color: #888; }
         button {
-            background: var(--gold); color: #111; padding: 12px; border: none;
+            background: var(--orange); color: #111; padding: 13px; border: none;
             border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: bold;
         }
-        button:hover { background: #f2ba85; }
-        .success { color: #6fdc8c; font-weight: bold; margin-top: 10px; }
-        .service-card { border-left: 3px solid var(--gold); }
+        button:hover { background: var(--orange-light); }
+        .success-msg { color: #7fd88f; font-weight: bold; text-align: center; }
+
+        .contact-info {
+            display: flex; justify-content: center; gap: 40px; flex-wrap: wrap;
+            margin: 30px auto; text-align: center;
+        }
+        .contact-info div span { display: block; color: var(--text-muted); font-size: 13px; }
+        .contact-info div strong { color: var(--orange); font-size: 16px; }
+
         .whatsapp-btn {
-            position: fixed; bottom: 20px; right: 20px; background: var(--gold); color: #111;
+            position: fixed; bottom: 20px; right: 20px; background: var(--orange); color: #111;
             padding: 14px 20px; border-radius: 4px; text-decoration: none; font-weight: bold;
             letter-spacing: 0.5px; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
-        .whatsapp-btn:hover { background: #f2ba85; }
-        footer { text-align: center; padding: 30px; color: #666; font-size: 13px; border-top: 1px solid #222; margin-top: 40px; }
+        .whatsapp-btn:hover { background: var(--orange-light); }
+
+        .footer-banner {
+            background: var(--orange); color: #111; text-align: center; padding: 16px;
+            font-weight: bold; letter-spacing: 0.5px; margin-top: 40px;
+        }
+        footer.copyright { text-align: center; padding: 24px; color: #666; font-size: 13px; }
     </style>
 </head>
 <body>
     <nav>
-        <div class="brand-group">
-            <img src="/static/images/logo.jpg" alt="{{ business_name }} logo">
-        </div>
+        <img src="/static/images/logo.jpg" alt="{{ business_name }} logo">
         <div class="links">
-            <a href="/">Home</a>
-            <a href="/sell-car">Sell Your Car</a>
-            <a href="/graphic-design">Graphic Design</a>
-            <a href="/course">Course</a>
-            <a href="/about">About</a>
-            <a href="/contact">Contact</a>
+            <a href="/#services">Services</a>
+            <a href="/#about">About</a>
+            <a href="/#contact">Contact</a>
         </div>
     </nav>
 
-    <div class="container">
-        {{ content|safe }}
-    </div>
+    {{ content|safe }}
 
     <a class="whatsapp-btn" href="https://wa.me/{{ whatsapp }}" target="_blank">WhatsApp Us</a>
 
-    <footer>&copy; {{ year }} {{ business_name }}. All rights reserved.</footer>
+    <div class="footer-banner">YOUR SUCCESS IS OUR MISSION</div>
+    <footer class="copyright">&copy; {{ year }} {{ business_name }}. All rights reserved.</footer>
 </body>
 </html>
 """
 
-def render_page(page_title, content):
+def render_page(content):
     return render_template_string(
-        BASE_TEMPLATE,
+        PAGE_TEMPLATE,
         business_name=BUSINESS_NAME,
-        page_title=page_title,
         content=content,
         whatsapp=WHATSAPP_NUMBER,
         year=datetime.now().year
@@ -198,129 +299,123 @@ def render_page(page_title, content):
 # ---------------------------------------------------------------------------
 # ROUTES
 # ---------------------------------------------------------------------------
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 def home():
-    content = """
-    <div class="card">
-        <h1>Sell Your Car Fast. Look Sharp. Build Your Business.</h1>
-        <p class="tagline">We take your business to the higher level.</p>
-        <p>We help you sell your car quickly, design standout graphics for your brand,
-           and teach you how to build a business through our entrepreneurial course.</p>
-    </div>
-    <div class="card service-card"><a href="/sell-car"><h2>Sell Your Car</h2></a><p>Get a fast, hassle-free sale.</p></div>
-    <div class="card service-card"><a href="/graphic-design"><h2>Graphic Design</h2></a><p>Logos, flyers, social media content and more.</p></div>
-    <div class="card service-card"><a href="/course"><h2>Entrepreneurial Course</h2></a><p>Learn how to start and grow your own business.</p></div>
-    """
-    return render_page("Home", content)
-
-
-@app.route("/sell-car", methods=["GET", "POST"])
-def sell_car():
     success = False
     if request.method == "POST":
         save_lead(
             request.form.get("name"),
             request.form.get("phone"),
             request.form.get("email"),
-            "sell_car",
-            request.form.get("car_details")
-        )
-        success = True
-
-    content = """
-    <h1>Sell Your Car Fast</h1>
-    <p>Fill in your car details below and we'll be in touch shortly.</p>
-    <div class="card">
-        <form method="POST">
-            <input type="text" name="name" placeholder="Your Full Name" required>
-            <input type="tel" name="phone" placeholder="Phone Number" required>
-            <input type="email" name="email" placeholder="Email (optional)">
-            <textarea name="car_details" rows="4" placeholder="Car Make, Model, Year, Asking Price" required></textarea>
-            <button type="submit">Submit</button>
-        </form>
-        {% if success %}<p class="success">Thank you. We'll contact you shortly.</p>{% endif %}
-    </div>
-    """
-    content = render_template_string(content, success=success)
-    return render_page("Sell Your Car", content)
-
-
-@app.route("/graphic-design")
-def graphic_design():
-    content = """
-    <h1>Graphic Design Services</h1>
-    <div class="card">
-        <p>We design logos, flyers, business cards, and social media content that make your brand stand out.</p>
-        <ul>
-            <li>Logo Design</li>
-            <li>Social Media Graphics</li>
-            <li>Flyers & Posters</li>
-            <li>Business Branding Packages</li>
-        </ul>
-        <p>Message us on WhatsApp to discuss your project and get a quote.</p>
-    </div>
-    """
-    return render_page("Graphic Design", content)
-
-
-@app.route("/course")
-def course():
-    content = """
-    <h1>Entrepreneurial Course</h1>
-    <div class="card">
-        <p>Learn the practical steps to start, market, and grow your own business - taught from real experience.</p>
-        <ul>
-            <li>Finding and validating a business idea</li>
-            <li>Marketing on a small budget</li>
-            <li>Basic financial management</li>
-            <li>Building a brand people trust</li>
-        </ul>
-        <p>Contact us on WhatsApp or via the contact page to enrol.</p>
-    </div>
-    """
-    return render_page("Entrepreneurial Course", content)
-
-
-@app.route("/about")
-def about():
-    content = """
-    <h1>About Us</h1>
-    <div class="card">
-        <p>We're a marketing agency helping everyday people sell their cars faster,
-           build stronger visual brands, and start their own businesses with confidence.</p>
-    </div>
-    """
-    return render_page("About", content)
-
-
-@app.route("/contact", methods=["GET", "POST"])
-def contact():
-    success = False
-    if request.method == "POST":
-        save_lead(
-            request.form.get("name"),
-            request.form.get("phone"),
-            request.form.get("email"),
-            "general_contact",
+            "contact_form",
             request.form.get("message")
         )
         success = True
 
+    services_html = "".join(
+        f'<div class="service-card" onclick="selectService(\'{s["title"]}\', this)">'
+        f'<h3>{s["title"]}<span class="arrow">&#8594;</span></h3>'
+        f'<p>{s["text"]}</p></div>'
+        for s in SERVICES
+    )
+
     content = """
-    <h1>Contact Us</h1>
-    <div class="card">
+    <div class="hero">
+        <p class="tagline">{{ tagline }}</p>
+        <h1>We Boost <span class="highlight">Brands</span>.<br>We Grow <span class="highlight">Businesses</span>.</h1>
+        <p class="description">
+            We specialise in boosting brand presence and achieving marketing goals in order to increase more customers.
+        </p>
+    </div>
+
+    <div class="promise-strip">
+        <div class="item"><span>Strategy</span></div>
+        <div class="item"><span>Creativity</span></div>
+        <div class="item"><span>Results</span></div>
+    </div>
+
+    <div class="section" id="services">
+        <div class="section-label">OUR SERVICES</div>
+        <p style="color: var(--text-muted); margin-top: -16px; margin-bottom: 26px; font-size: 15px;">
+            Click on what you need help with — we'll take you straight to the form.
+        </p>
+        <div class="services-grid">
+            {{ services_html|safe }}
+        </div>
+    </div>
+
+    <div class="cta-box" id="about">
+        <h2>More Visibility. More Customers. More Growth.</h2>
+        <p>Let's grow your brand together.</p>
+    </div>
+
+    <div class="section" id="contact">
+        <div class="section-label">GET IN TOUCH</div>
+        <p id="selected-service-note" style="color: var(--orange); font-weight: bold; display: none; margin-top: -16px; margin-bottom: 20px;"></p>
+        <div class="contact-info">
+            <div><span>Call or WhatsApp</span><strong>{{ phone }}</strong></div>
+            <div><span>Email</span><strong>{{ email }}</strong></div>
+        </div>
         <form method="POST">
             <input type="text" name="name" placeholder="Your Full Name" required>
             <input type="tel" name="phone" placeholder="Phone Number" required>
-            <input type="email" name="email" placeholder="Email (optional)">
-            <textarea name="message" rows="4" placeholder="Your Message" required></textarea>
-            <button type="submit">Send</button>
+            <input type="email" name="email" placeholder="Email Address" required>
+            <input type="hidden" name="interested_service" id="interested_service" value="">
+            <textarea name="message" id="message-box" rows="4" placeholder="Tell us about your business and what you need" required></textarea>
+            <button type="submit">Send Message</button>
         </form>
-        {% if success %}<p class="success">Message sent. We'll get back to you soon.</p>{% endif %}
+        {% if success %}<p class="success-msg">Thank you. We'll be in touch shortly.</p>{% endif %}
     </div>
+
+    <script>
+        function selectService(title, cardEl) {
+            document.querySelectorAll('.service-card').forEach(function(c) {
+                c.classList.remove('selected');
+            });
+            cardEl.classList.add('selected');
+
+            document.getElementById('interested_service').value = title;
+
+            var note = document.getElementById('selected-service-note');
+            note.textContent = "You're enquiring about: " + title;
+            note.style.display = 'block';
+
+            var box = document.getElementById('message-box');
+            if (!box.value) {
+                box.value = "Hi, I'd like help with " + title + ". ";
+            }
+
+            document.getElementById('contact').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(function() { box.focus(); }, 500);
+        }
+
+        // Fade-in animation for sections as they scroll into view
+        var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, { threshold: 0.15 });
+
+        document.querySelectorAll('.service-card, .cta-box').forEach(function(el) {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(16px)';
+            el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            observer.observe(el);
+        });
+    </script>
     """
-    content = render_template_string(content, success=success)
-    return render_page("Contact", content)
+    content = render_template_string(
+        content,
+        tagline=TAGLINE,
+        services_html=services_html,
+        phone=PHONE_DISPLAY,
+        email=EMAIL,
+        success=success
+    )
+    return render_page(content)
 
 
 # ---------------------------------------------------------------------------
