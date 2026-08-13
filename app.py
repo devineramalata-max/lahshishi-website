@@ -162,6 +162,7 @@ PAGE_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="v2LWsbfodM08U3P8dIevdQv91YLXhM3PsdjZvUaIiUI" />
     <meta name="description" content="Lahshishi Marketing Agency helps businesses grow through social media management, content creation, website design, business registration, and growth strategies.">
     <meta name="keywords" content="marketing agency, social media management, content creation, website design, business registration, business growth strategies, South Africa">
     <meta property="og:title" content="{{ business_name }} - We Take Your Business To The Higher Level">
